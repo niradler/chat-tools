@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { ChatView, MessageInput, StatusBar, Layout } from "@chat-tools/tui";
-import { createAgent } from "./ai-agent.js";
+import { createAgent } from "./chat.js";
+import { Agent } from "./agent.js";
 
 interface Message {
   id: string;
@@ -24,7 +25,8 @@ export const ChatApp: React.FC = () => {
     const initializeAgent = async () => {
       try {
         setStatus("connecting");
-        setAgent(createAgent());
+        const newAgent = await createAgent();
+        setAgent(newAgent);
         setStatus("connected");
 
         // Add welcome message
@@ -74,7 +76,7 @@ export const ChatApp: React.FC = () => {
         content: msg.content,
       }));
 
-      const response = await agent.generateResponse(
+      const response = await agent.generateTextResponse(
         message,
         conversationHistory
       );
@@ -88,11 +90,11 @@ export const ChatApp: React.FC = () => {
           response.steps && response.steps.length > 0
             ? {
                 toolCalls: response.steps.flatMap(
-                  (step) => step.toolCalls || []
+                  (step: any) => step.toolCalls || []
                 ).length,
                 tools: response.steps
-                  .flatMap((step) => step.toolCalls || [])
-                  .map((tc) => tc.toolName),
+                  .flatMap((step: any) => step.toolCalls || [])
+                  .map((tc: any) => tc.toolName),
               }
             : undefined,
       };
