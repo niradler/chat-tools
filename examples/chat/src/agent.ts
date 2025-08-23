@@ -143,6 +143,11 @@ export class Agent {
             ...this.streamTextOptions
         };
 
+        if (this.hasTools) {
+            streamTextOptions.tools = this.tools;
+            streamTextOptions.stopWhen = stepCountIs(5);
+        }
+
         return streamText(streamTextOptions);
     }
 

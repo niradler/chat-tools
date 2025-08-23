@@ -5,6 +5,7 @@ import { Experimental_StdioMCPTransport as StdioMCPTransport } from 'ai/mcp-stdi
 import { ollama } from 'ollama-ai-provider-v2';
 import { Storage, type StorageProvider, type SchemaMessage as Message, type SchemaConversation as Conversation } from '@chat-tools/storage';
 import type { StreamTextResult, ToolSet } from 'ai';
+import { ExtensionManager, type Extension } from './extensions';
 
 const systemPrompt = `
 You are a helpful assistant that can check package versions, and provide information about npm packages. 
@@ -75,6 +76,7 @@ export interface ChatOptions {
     storage?: StorageProvider;
     dbPath?: string;
     agentOptions?: Partial<AgentOptions>;
+    extensions?: Extension[];
 }
 
 export interface ChatMessage {
@@ -90,20 +92,40 @@ export class Chat {
     private model: LanguageModelV2;
     private systemPrompt: string;
     private agentOptions: Partial<AgentOptions>;
+    private extensionManager: ExtensionManager;
 
     constructor(options: ChatOptions = {}) {
         this.systemPrompt = options.systemPrompt || systemPrompt;
         this.model = options.model || getDefaultModel();
         this.tools = options.tools || {};
         this.agentOptions = options.agentOptions || {};
+        this.extensionManager = new ExtensionManager();
 
         this.storage = options.storage || (new Storage(options.dbPath || `./${options.name}.db`) as StorageProvider);
+
+        // Register extensions
+        if (options.extensions) {
+            for (const extension of options.extensions) {
+                this.extensionManager.register(extension);
+            }
+        }
+
+        const extensionOptions = this.extensionManager.toAISDKOptions();
 
         this.agent = new Agent({
             systemPrompt: this.systemPrompt,
             model: this.model,
             tools: this.tools,
-            ...this.agentOptions
+            ...this.agentOptions,
+            middlewares: [...(this.agentOptions.middlewares || []), ...extensionOptions.middlewares],
+            generateTextOptions: {
+                ...this.agentOptions.generateTextOptions,
+                ...extensionOptions.generateTextOptions
+            },
+            streamTextOptions: {
+                ...this.agentOptions.streamTextOptions,
+                ...extensionOptions.streamTextOptions
+            }
         });
     }
 
@@ -113,13 +135,26 @@ export class Chat {
         // Load tools if not provided
         if (Object.keys(this.tools).length === 0) {
             this.tools = await getTools();
+
+            const extensionOptions = this.extensionManager.toAISDKOptions();
             this.agent = new Agent({
                 systemPrompt: this.systemPrompt,
                 model: this.model,
                 tools: this.tools,
-                ...this.agentOptions
+                ...this.agentOptions,
+                middlewares: [...(this.agentOptions.middlewares || []), ...extensionOptions.middlewares],
+                generateTextOptions: {
+                    ...this.agentOptions.generateTextOptions,
+                    ...extensionOptions.generateTextOptions
+                },
+                streamTextOptions: {
+                    ...this.agentOptions.streamTextOptions,
+                    ...extensionOptions.streamTextOptions
+                }
             });
         }
+
+        await this.extensionManager.init(this);
     }
 
     async createConversation(name: string, config?: Record<string, any>): Promise<string> {
@@ -147,7 +182,6 @@ export class Chat {
         messageId: string;
         responseId: string;
     }> {
-        // Save user message
         const messageId = await this.storage.addMessage({
             conversationId,
             role: 'user',
@@ -155,14 +189,11 @@ export class Chat {
             metadata
         });
 
-        // Get conversation history
         const history = await this.getConversationHistory(conversationId);
 
-        // Generate response using agent
         const result = await this.agent.generateTextResponse(content, history);
         const response = result.text || '';
 
-        // Save assistant response
         const responseId = await this.storage.addMessage({
             conversationId,
             role: 'assistant',
@@ -192,7 +223,6 @@ export class Chat {
         // Get conversation history
         const history = await this.getConversationHistory(conversationId);
 
-        // Generate streaming response using agent
         const stream = await this.agent.streamTextResponse(content, history);
 
         return { stream, messageId };
@@ -280,6 +310,8 @@ export class Chat {
 
 
 
+
+
     // Cleanup
     async close(): Promise<void> {
         await this.storage.close();
@@ -290,10 +322,14 @@ export class Chat {
 async function main() {
     console.log('🚀 Testing Chat Class\n');
 
-    // Create a new chat instance
+    // Import extensions
+    const { loggingExtension } = await import('./logging-extension');
+
+    // Create a new chat instance with extensions
     const chat = new Chat({
         name: 'Test Chat',
-        dbPath: './test-chat.db'
+        dbPath: './test-chat.db',
+        extensions: [loggingExtension]
     });
 
     // Initialize the chat (sets up storage and loads tools)
