@@ -1,11 +1,10 @@
 import { Agent, type AgentOptions } from './agent';
 import { LanguageModelV2Middleware, type LanguageModelV2 } from '@ai-sdk/provider';
-import { experimental_createMCPClient as createMCPClient } from 'ai';
-import { Experimental_StdioMCPTransport as StdioMCPTransport } from 'ai/mcp-stdio';
 import { ollama } from 'ollama-ai-provider-v2';
 import { Storage, type StorageProvider, type SchemaMessage as Message, type SchemaConversation as Conversation } from '@chat-tools/storage';
 import type { StreamTextResult, ToolSet } from 'ai';
 import { ExtensionManager, type Extension } from './extensions';
+import { MCPManager, type MCPServerConfig } from './mcp-manager';
 
 const systemPrompt = `
 You are a helpful assistant that can check package versions, and provide information about npm packages. 
@@ -17,28 +16,17 @@ export function getDefaultModel(): LanguageModelV2 {
 }
 
 export async function getTools(): Promise<Record<string, any>> {
-    try {
-        let command = 'npx';
-        let args = ['-y', 'dependency-mcp'];
-
-        if (process.platform === 'win32') {
-            command = 'cmd';
-            args = ['/c', 'npx', '-y', 'dependency-mcp'];
+    const mcpManager = new MCPManager([
+        {
+            type: 'stdio',
+            command: 'npx',
+            args: ['-y', 'dependency-mcp'],
+            name: 'dependency-checker'
         }
+    ]);
 
-        const mcpClient = await createMCPClient({
-            transport: new StdioMCPTransport({
-                command,
-                args,
-            }),
-        });
-        const tools = await mcpClient.tools();
-        return tools;
-    } catch (error) {
-        console.error('Failed to initialize MCP tools:', error);
-        // Return empty tools object as fallback
-        return {};
-    }
+    await mcpManager.initialize();
+    return mcpManager.getTools();
 }
 
 export async function createAgent() {
@@ -77,6 +65,7 @@ export interface ChatOptions {
     dbPath?: string;
     agentOptions?: Partial<AgentOptions>;
     extensions?: Extension[];
+    mcpServers?: MCPServerConfig[];
 }
 
 export interface ChatMessage {
@@ -93,6 +82,7 @@ export class Chat {
     private systemPrompt: string;
     private agentOptions: Partial<AgentOptions>;
     private extensionManager: ExtensionManager;
+    private mcpManager: MCPManager;
 
     constructor(options: ChatOptions = {}) {
         this.systemPrompt = options.systemPrompt || systemPrompt;
@@ -100,6 +90,7 @@ export class Chat {
         this.tools = options.tools || {};
         this.agentOptions = options.agentOptions || {};
         this.extensionManager = new ExtensionManager();
+        this.mcpManager = new MCPManager(options.mcpServers || []);
 
         this.storage = options.storage || (new Storage(options.dbPath || `./${options.name}.db`) as StorageProvider);
 
@@ -132,27 +123,29 @@ export class Chat {
     async initialize(): Promise<void> {
         await this.storage.initialize();
 
-        // Load tools if not provided
-        if (Object.keys(this.tools).length === 0) {
-            this.tools = await getTools();
+        // Initialize MCP servers and get tools
+        await this.mcpManager.initialize();
+        const mcpTools = this.mcpManager.getTools();
 
-            const extensionOptions = this.extensionManager.toAISDKOptions();
-            this.agent = new Agent({
-                systemPrompt: this.systemPrompt,
-                model: this.model,
-                tools: this.tools,
-                ...this.agentOptions,
-                middlewares: [...(this.agentOptions.middlewares || []), ...extensionOptions.middlewares],
-                generateTextOptions: {
-                    ...this.agentOptions.generateTextOptions,
-                    ...extensionOptions.generateTextOptions
-                },
-                streamTextOptions: {
-                    ...this.agentOptions.streamTextOptions,
-                    ...extensionOptions.streamTextOptions
-                }
-            });
-        }
+        // Merge provided tools with MCP tools
+        this.tools = { ...this.tools, ...mcpTools };
+
+        const extensionOptions = this.extensionManager.toAISDKOptions();
+        this.agent = new Agent({
+            systemPrompt: this.systemPrompt,
+            model: this.model,
+            tools: this.tools,
+            ...this.agentOptions,
+            middlewares: [...(this.agentOptions.middlewares || []), ...extensionOptions.middlewares],
+            generateTextOptions: {
+                ...this.agentOptions.generateTextOptions,
+                ...extensionOptions.generateTextOptions
+            },
+            streamTextOptions: {
+                ...this.agentOptions.streamTextOptions,
+                ...extensionOptions.streamTextOptions
+            }
+        });
 
         await this.extensionManager.init(this);
     }
@@ -257,8 +250,6 @@ export class Chat {
     async updateTools(tools?: Record<string, any>): Promise<void> {
         if (tools) {
             this.tools = tools;
-        } else {
-            this.tools = await getTools();
         }
 
         // Recreate agent with new tools
@@ -312,8 +303,17 @@ export class Chat {
 
 
 
+    addMCPServer(config: MCPServerConfig): void {
+        this.mcpManager.addServer(config);
+    }
+
+    getMCPTools(): Record<string, any> {
+        return this.mcpManager.getTools();
+    }
+
     // Cleanup
     async close(): Promise<void> {
+        await this.mcpManager.close();
         await this.storage.close();
     }
 }
@@ -325,11 +325,27 @@ async function main() {
     // Import extensions
     const { loggingExtension } = await import('./logging-extension');
 
-    // Create a new chat instance with extensions
+    // Create a new chat instance with extensions and MCP servers
     const chat = new Chat({
         name: 'Test Chat',
         dbPath: './test-chat.db',
-        extensions: [loggingExtension]
+        agentOptions: {
+            generateTextOptions: {
+                providerOptions: { ollama: { think: true } }
+            },
+            streamTextOptions: {
+                providerOptions: { ollama: { think: true } }
+            }
+        },
+        extensions: [loggingExtension],
+        mcpServers: [
+            {
+                type: 'stdio',
+                command: 'npx',
+                args: ['-y', 'dependency-mcp'],
+                name: 'dependency-checker'
+            }
+        ]
     });
 
     // Initialize the chat (sets up storage and loads tools)
