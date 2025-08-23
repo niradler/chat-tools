@@ -1,0 +1,31 @@
+{
+  "name": "@chat-tools/cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for chat-tools framework",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "chat-tools": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@chat-tools/core": "workspace:*",
+    "@chat-tools/storage": "workspace:*",
+    "@chat-tools/tui": "workspace:*",
+    "@chat-tools/agent": "workspace:*",
+    "commander": "^12.0.0",
+    "@clack/prompts": "^0.8.0",
+    "chalk": "^5.3.0",
+    "ink": "^5.0.0",
+    "react": "^18.2.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0"
+  }
+}

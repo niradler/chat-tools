@@ -1,0 +1,175 @@
+{
+    "name": "Shell Expert Assistant",
+    "version": "1.0.0",
+    "ai": {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "temperature": 0.3,
+        "maxTokens": 2000
+    },
+    "database": {
+        "path": "./shell-assistant.db",
+        "backup": {
+            "enabled": true,
+            "interval": 30,
+            "path": "./backups"
+        }
+    },
+    "mcp": {
+        "servers": [],
+        "timeout": 30000
+    },
+    "approval": {
+        "mode": "smart",
+        "timeout": 45000,
+        "rules": [
+            {
+                "toolName": "execute-command",
+                "condition": "params => params.command.trim().startsWith('ls') || params.command.trim().startsWith('pwd')",
+                "action": "allow",
+                "message": "Auto-approved: Safe read-only command",
+                "priority": 10
+            },
+            {
+                "toolName": "execute-command",
+                "condition": "params => params.command.includes('rm -rf') || params.command.includes('sudo rm')",
+                "action": "prompt",
+                "message": "⚠️  DANGER: This command can permanently delete files!",
+                "priority": 30
+            },
+            {
+                "toolName": "shell-generate-script",
+                "action": "allow",
+                "message": "Script generation is safe",
+                "priority": 5
+            },
+            {
+                "toolName": "shell-explain",
+                "action": "allow",
+                "message": "Command explanation is safe",
+                "priority": 5
+            },
+            {
+                "toolName": "shell-validate",
+                "action": "allow",
+                "message": "Command validation is safe",
+                "priority": 5
+            }
+        ],
+        "autoWhitelist": {
+            "enabled": true,
+            "safeCommands": [
+                "ls",
+                "ll",
+                "pwd",
+                "whoami",
+                "id",
+                "date",
+                "uptime",
+                "ps",
+                "top",
+                "htop",
+                "df",
+                "du",
+                "free",
+                "which",
+                "whereis",
+                "man",
+                "help",
+                "history",
+                "env",
+                "printenv",
+                "echo",
+                "cat",
+                "less",
+                "more",
+                "head",
+                "tail",
+                "grep",
+                "find . -name",
+                "git status",
+                "git log",
+                "git diff"
+            ]
+        }
+    },
+    "agent": {
+        "systemPrompt": "You are an expert shell scripting and command-line assistant with deep knowledge of Unix/Linux systems, bash, zsh, fish, and PowerShell.\n\nYour expertise includes:\n- Shell scripting best practices and optimization\n- Command-line utilities and their advanced usage\n- System administration and automation\n- Security considerations for shell operations\n- Cross-platform compatibility\n- Performance optimization\n- Error handling and debugging\n\nAlways prioritize safety and explain potentially dangerous operations. Provide clear explanations, examples, and suggest alternatives when appropriate. Use the shell-specific tools to enhance your responses with detailed analysis and validation.",
+        "templates": {
+            "command_explanation": "Let me explain this command step by step:\n\n**Command:** `{command}`\n\n**Breakdown:**\n{breakdown}\n\n**Safety Level:** {safety}\n\n**Purpose:** {purpose}",
+            "script_generation": "I'll generate a shell script for your task:\n\n**Task:** {task}\n**Target Shell:** {shell}\n\n```{shell}\n{script}\n```\n\n**Usage:** {usage}\n**Safety Notes:** {safety_notes}",
+            "optimization_suggestion": "Here's how you can optimize this command:\n\n**Original:** `{original}`\n**Optimized:** `{optimized}`\n\n**Benefits:** {benefits}\n**Explanation:** {explanation}"
+        },
+        "behavior": {
+            "conversational": true,
+            "helpful": true,
+            "concise": false,
+            "explainCommands": true
+        },
+        "memory": {
+            "enabled": true,
+            "contextWindow": 20,
+            "summarizeAfter": 100
+        }
+    },
+    "ui": {
+        "theme": "dark",
+        "showTimestamps": true,
+        "showTokenCount": false,
+        "maxDisplayMessages": 50
+    },
+    "extensions": [
+        {
+            "name": "shell-extension",
+            "enabled": true,
+            "source": "local",
+            "config": {
+                "preferredShell": "bash",
+                "safetyLevel": "moderate",
+                "autoExplain": false,
+                "scriptDefaults": {
+                    "includeShebang": true,
+                    "includeComments": true,
+                    "errorHandling": true
+                }
+            }
+        }
+    ],
+    "tools": {
+        "enabled": [
+            "executeCommand",
+            "fileOperations",
+            "systemInfo",
+            "shell-explain",
+            "shell-validate",
+            "shell-generate-script",
+            "shell-environment",
+            "shell-process-info",
+            "shell-oneliner",
+            "shell-analyze-script",
+            "shell-build-command"
+        ],
+        "disabled": [],
+        "custom": [
+            {
+                "name": "shell-cheat",
+                "description": "Quick reference for shell commands and patterns",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {
+                            "type": "string",
+                            "description": "Topic to get help with (e.g., 'find', 'awk', 'sed', 'loops')"
+                        }
+                    },
+                    "required": [
+                        "topic"
+                    ]
+                },
+                "handler": "@chat-tools/shell/cheat",
+                "requiresApproval": false,
+                "category": "reference"
+            }
+        ]
+    }
+}

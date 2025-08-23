@@ -1,0 +1,73 @@
+{
+  "name": "Ollama Shell Assistant Test",
+  "version": "1.0.0",
+  "ai": {
+    "provider": "ollama",
+    "model": "qwen3:30b",
+    "baseUrl": "http://localhost:11434",
+    "temperature": 0.2,
+    "maxTokens": 2000
+  },
+  "database": {
+    "path": "./test-ollama.db"
+  },
+  "mcp": {
+    "servers": [],
+    "timeout": 30000
+  },
+  "approval": {
+    "enabled": true
+  },
+  "agent": {
+    "systemPrompt": "You are an expert shell scripting assistant running on a local Ollama model. You have deep knowledge of command-line tools, shell scripting, and system administration.\n\nYour capabilities include:\n- Explaining shell commands in detail\n- Generating safe and efficient scripts\n- Analyzing commands for security issues\n- Providing system information and monitoring\n- Building complex commands interactively\n\nAlways prioritize safety and explain potentially dangerous operations. Use your shell tools to provide detailed analysis and validation. Keep responses concise but informative.",
+    "templates": {},
+    "behavior": {
+      "conversational": true,
+      "helpful": true,
+      "concise": true,
+      "explainCommands": true
+    },
+    "memory": {
+      "enabled": true,
+      "contextWindow": 10,
+      "summarizeAfter": 50
+    }
+  },
+  "ui": {
+    "theme": "dark",
+    "showTimestamps": false,
+    "showTokenCount": true,
+    "maxDisplayMessages": 20
+  },
+  "extensions": [
+    {
+      "name": "shell-extension",
+      "enabled": true,
+      "source": "local",
+      "config": {
+        "preferredShell": "bash",
+        "safetyLevel": "moderate",
+        "autoExplain": false,
+        "scriptDefaults": {
+          "includeShebang": true,
+          "includeComments": true,
+          "errorHandling": true
+        }
+      }
+    }
+  ],
+  "tools": {
+    "enabled": [
+      "executeCommand",
+      "fileOperations",
+      "systemInfo",
+      "shell-explain",
+      "shell-validate",
+      "shell-generate-script",
+      "shell-environment",
+      "shell-oneliner"
+    ],
+    "disabled": [],
+    "custom": []
+  }
+}

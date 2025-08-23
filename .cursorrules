@@ -1,0 +1,163 @@
+# Chat Tools Framework - Development Guide
+
+## Project Overview
+
+TypeScript framework for building intelligent terminal chat applications with MCP integration, tool calling, and human-in-the-loop approval systems.
+
+**Core Philosophy**: Configuration-driven extensible framework that allows developers to create terminal chat assistants without coding - just configure JSON files.
+
+## Architecture & Packages
+
+```
+packages/
+├── core/          # Types, configs, agent templates
+├── storage/       # Drizzle ORM + SQLite database
+├── tui/          # Ink React terminal UI components
+├── agent/        # AI SDK v5 integration + MCP + approval
+├── cli/          # Commander.js CLI interface
+├── extensions/   # Flexible hook-based extension system
+└── shell/        # Shell scripting extension example
+```
+
+## Key Design Principles
+
+1. **Configuration-First**: Enable no-code usage via JSON configs
+2. **Extension-Driven**: Comprehensive hook system for customization
+3. **Safety-First**: Human-in-the-loop approval for dangerous operations
+4. **Type-Safe**: Full TypeScript with Zod validation throughout
+5. **Monorepo Structure**: pnpm workspaces for clean dependencies
+
+## Development Guidelines
+
+### Code Style
+
+- Always use TypeScript with strict mode
+- Import statements at top of file (not inside functions unless dynamic)
+- No comments in code unless specifically requested
+- Prefer generic, reusable patterns that extend easily
+- Use Zod for all schema validation
+
+### AI SDK Integration
+
+- Use AI SDK v5 patterns from https://ai-sdk.dev/docs/foundations/agents
+- Follow AI SDK tool creation with `tool()` function from 'ai' package
+- Use `generateText` for agent interactions with multi-step tool usage
+- Leverage extension hooks for framework integration
+- Always validate user inputs with Zod schemas
+
+### Safety & Approval
+
+- Classify operations as safe/dangerous in approval rules
+- Use whitelisting for commonly safe operations
+- Provide clear warnings for destructive actions
+- Implement proper error handling and validation
+
+### Testing & Dependencies
+
+- Use .venv for Python environments if available, else venv
+- Use pnpm for Node.js projects (not npm)
+- Prefer built-in tools and existing patterns
+- Clean up temporary test files when done
+
+## Package Dependencies
+
+### Core Stack
+
+- **AI Integration**: ai@5.0.22, @ai-sdk/openai@2.0.19, @ai-sdk/anthropic@2.0.6
+- **Database**: drizzle-orm, better-sqlite3
+- **CLI/TUI**: commander, @clack/prompts, ink, react, clack
+- **Validation**: zod
+- **Build**: typescript, pnpm workspaces
+
+### Extension System
+
+- Hook-based lifecycle management
+- Dynamic tool/component loading
+- Dependency resolution with semver
+- Event-driven architecture
+
+## Configuration Patterns
+
+### Agent Templates
+
+```json
+{
+  "ai": { "provider": "openai", "model": "gpt-4o" },
+  "approval": { "mode": "smart", "rules": [...] },
+  "tools": { "enabled": ["executeCommand", "fileOperations"] },
+  "extensions": [{ "name": "shell-extension", "enabled": true }]
+}
+```
+
+### AI SDK Tool Creation
+
+```typescript
+import { tool } from "ai";
+import { z } from "zod";
+
+export const myTool = tool({
+  description: "What the tool does",
+  parameters: z.object({
+    param: z.string().describe("Parameter description"),
+  }),
+  execute: async ({ param }) => {
+    // Tool implementation
+    return { result: "success" };
+  },
+});
+```
+
+### Extension Structure
+
+```typescript
+export const extension: Extension = {
+  name: 'extension-name',
+  hooks: { 'agent:beforeCreate': async (ctx) => { ... } },
+  getTools: async (ctx) => [...],
+  activate: async (ctx) => { ... }
+}
+```
+
+## Testing Guidelines
+
+### Manual Testing Focus
+
+- Test configuration loading and validation
+- Verify agent creation with different providers
+- Test tool execution with approval system
+- Validate extension loading and hooks
+- Check CLI commands and TUI interaction
+
+### Provider Testing
+
+- OpenAI GPT models (gpt-4, gpt-4o)
+- Anthropic Claude (Claude 3 family)
+- Local Ollama models (Llama, Mistral, etc.)
+- Custom OpenAI-compatible APIs
+
+## File Patterns to Follow
+
+- Use workspace:\* for internal package dependencies
+- Keep package.json scripts minimal (build, dev)
+- Use proper TypeScript configuration inheritance
+- Follow established naming conventions
+- Maintain clean exports in index.ts files
+
+## Common Operations
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
+
+# Development mode
+pnpm dev
+
+# Test CLI
+./packages/cli/dist/cli.js --help
+
+# Start with config
+./packages/cli/dist/cli.js start --config ./examples/config-based/shell-expert.json
+```

@@ -1,0 +1,126 @@
+{
+  "name": "Shell Helper",
+  "version": "1.0.0",
+
+  "ai": {
+    "provider": "anthropic",
+    "model": "claude-3-sonnet-20240229", 
+    "apiKey": "${ANTHROPIC_API_KEY}",
+    "maxTokens": 3000,
+    "temperature": 0.1
+  },
+
+  "database": {
+    "path": "./data/shell-helper.db"
+  },
+
+  "mcp": {
+    "servers": [
+      {
+        "name": "filesystem",
+        "type": "stdio",
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-filesystem", "."],
+        "description": "File operations"
+      }
+    ],
+    "timeout": 10000
+  },
+
+  "approval": {
+    "mode": "smart",
+    "timeout": 20000,
+    "rules": [
+      {
+        "toolName": "execute_command",
+        "condition": "params.command.includes('rm ') || params.command.includes('delete') || params.command.includes('format')",
+        "action": "prompt",
+        "message": "🗑️  This command will delete files or data",
+        "priority": 100
+      },
+      {
+        "toolName": "execute_command",
+        "condition": "params.command.includes('sudo') || params.command.includes('su ')",
+        "action": "prompt", 
+        "message": "🔐 This command requires administrator privileges",
+        "priority": 90
+      }
+    ],
+    "autoWhitelist": {
+      "enabled": true,
+      "safeCommands": ["ls", "pwd", "echo", "cat", "head", "tail", "grep", "find", "which", "whoami", "date"]
+    }
+  },
+
+  "agent": {
+    "systemPrompt": "You are a shell scripting expert and command-line assistant. You help users:\n- Generate bash/zsh/powershell scripts\n- Explain command-line tools and their options\n- Create automation scripts for repetitive tasks\n- Troubleshoot command-line issues\n- Optimize workflows with shell commands\n\nAlways prioritize safety and explain potentially dangerous operations clearly.\nGenerate scripts that are portable and well-commented.",
+
+    "templates": {
+      "greeting": "⚡ Welcome to Shell Helper! I can help you with command-line tasks, script generation, and shell automation. What would you like to accomplish?",
+      "scriptGenerated": "I've generated this script for you:\n\n```{language}\n{script}\n```\n\n**What it does:**\n{explanation}\n\n**To use it:**\n{usage}",
+      "commandExplanation": "The command `{command}` will:\n{explanation}\n\n**Breakdown:**\n{breakdown}"
+    },
+
+    "behavior": {
+      "conversational": true,
+      "helpful": true, 
+      "concise": false,
+      "explainCommands": true
+    },
+
+    "memory": {
+      "enabled": true,
+      "contextWindow": 8000,
+      "summarizeAfter": 30
+    }
+  },
+
+  "ui": {
+    "theme": "dark",
+    "showTimestamps": false,
+    "showTokenCount": false,
+    "maxDisplayMessages": 30
+  },
+
+  "extensions": [
+    {
+      "name": "script-generator",
+      "enabled": true,
+      "config": {
+        "defaultShell": "bash",
+        "includeErrorHandling": true,
+        "addLogging": true
+      }
+    }
+  ],
+
+  "tools": {
+    "enabled": [
+      "execute_command",
+      "read_file",
+      "write_file", 
+      "generate_script",
+      "explain_command"
+    ],
+    "disabled": [],
+    "custom": [
+      {
+        "name": "generate_script",
+        "description": "Generate shell script from natural language description",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "shell": {"type": "string", "enum": ["bash", "zsh", "powershell"], "default": "bash"},
+            "includeComments": {"type": "boolean", "default": true},
+            "errorHandling": {"type": "boolean", "default": true}
+          },
+          "required": ["description"]
+        },
+        "handler": "./tools/script-generator.js",
+        "requiresApproval": false,
+        "category": "generation"
+      }
+    ]
+  }
+}

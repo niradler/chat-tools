@@ -1,0 +1,25 @@
+{
+  "name": "@chat-tools/core",
+  "version": "1.0.0",
+  "description": "Core types, utilities and configuration for chat-tools framework",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chat-tools/storage": "workspace:*",
+    "@chat-tools/tui": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

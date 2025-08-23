@@ -1,0 +1,28 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Backup files  
+backups/
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

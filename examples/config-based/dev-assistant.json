@@ -1,0 +1,162 @@
+{
+  "name": "Development Assistant",
+  "version": "1.0.0",
+  
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "apiKey": "${OPENAI_API_KEY}",
+    "maxTokens": 4000,
+    "temperature": 0.3
+  },
+
+  "database": {
+    "path": "./data/dev-assistant.db",
+    "backup": {
+      "enabled": true,
+      "interval": 60,
+      "path": "./backups/"
+    }
+  },
+
+  "mcp": {
+    "servers": [
+      {
+        "name": "filesystem",
+        "type": "stdio",
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-filesystem", "./workspace"],
+        "description": "File system operations in workspace"
+      },
+      {
+        "name": "git",
+        "type": "stdio", 
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-git"],
+        "description": "Git repository operations"
+      },
+      {
+        "name": "brave-search",
+        "type": "http",
+        "url": "https://api.search.brave.com/res/v1/web/search",
+        "headers": {
+          "X-Subscription-Token": "${BRAVE_SEARCH_API_KEY}"
+        },
+        "description": "Web search capabilities"
+      }
+    ],
+    "timeout": 15000
+  },
+
+  "approval": {
+    "mode": "smart",
+    "timeout": 30000,
+    "rules": [
+      {
+        "toolName": "execute_command",
+        "condition": "params.command.includes('rm -rf') || params.command.includes('sudo')",
+        "action": "prompt",
+        "message": "⚠️  This command requires elevated permissions or may delete files",
+        "priority": 100
+      },
+      {
+        "toolName": "execute_command", 
+        "condition": "['npm install', 'npm run', 'git add', 'git commit', 'git push'].some(cmd => params.command.startsWith(cmd))",
+        "action": "allow",
+        "priority": 50,
+        "whitelist": true
+      },
+      {
+        "toolName": "file_write",
+        "condition": "params.path.endsWith('.env') || params.path.includes('config')",
+        "action": "prompt",
+        "message": "🔐 Writing to configuration file - please review",
+        "priority": 75
+      }
+    ],
+    "autoWhitelist": {
+      "enabled": true,
+      "safeCommands": ["ls", "pwd", "echo", "cat", "grep", "find", "npm test", "git status", "git diff"]
+    }
+  },
+
+  "agent": {
+    "systemPrompt": "You are an expert software development assistant. You help with:\n- Code review and debugging\n- Project setup and configuration\n- Git operations and version control\n- Testing and deployment\n- Documentation and best practices\n\nAlways explain what commands do before executing them. Focus on security and best practices.",
+    
+    "templates": {
+      "greeting": "👋 Hello! I'm your development assistant. I can help with coding, git operations, project setup, and more. What are you working on?",
+      "commandExplanation": "I'll run: `{command}`\nThis will: {explanation}",
+      "codeReview": "Here's my analysis of the code:\n\n**Issues found:**\n{issues}\n\n**Suggestions:**\n{suggestions}\n\n**Security considerations:**\n{security}"
+    },
+
+    "behavior": {
+      "conversational": true,
+      "helpful": true,
+      "concise": false,
+      "explainCommands": true
+    },
+
+    "memory": {
+      "enabled": true,
+      "contextWindow": 12000,
+      "summarizeAfter": 40
+    }
+  },
+
+  "ui": {
+    "theme": "dark",
+    "showTimestamps": true,
+    "showTokenCount": true,
+    "maxDisplayMessages": 50
+  },
+
+  "extensions": [
+    {
+      "name": "git-tools",
+      "enabled": true,
+      "config": {
+        "autoFetch": true,
+        "defaultBranch": "main",
+        "conventionalCommits": true
+      }
+    },
+    {
+      "name": "code-analysis",
+      "enabled": true,
+      "config": {
+        "languages": ["typescript", "javascript", "python", "go"],
+        "lintOnSave": true,
+        "securityCheck": true
+      }
+    }
+  ],
+
+  "tools": {
+    "enabled": [
+      "execute_command",
+      "read_file", 
+      "write_file",
+      "search_files",
+      "git_operations",
+      "npm_operations",
+      "web_search"
+    ],
+    "disabled": ["system_info"],
+    "custom": [
+      {
+        "name": "deploy_to_staging",
+        "description": "Deploy current branch to staging environment",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "branch": {"type": "string", "default": "main"},
+            "environment": {"type": "string", "enum": ["staging", "preview"]}
+          }
+        },
+        "handler": "./tools/deploy.js",
+        "requiresApproval": true,
+        "category": "deployment"
+      }
+    ]
+  }
+}
