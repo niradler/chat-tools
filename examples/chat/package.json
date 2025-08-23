@@ -1,0 +1,26 @@
+{
+  "name": "chat-example",
+  "version": "1.0.0",
+  "description": "Chat example with MCP support and TUI",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@chat-tools/tui": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ai": "^5.0.22",
+    "ink": "^4.4.1",
+    "ollama-ai-provider-v2": "^1.1.2",
+    "react": "^18.2.0",
+    "tsx": "^4.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
+  }
+}

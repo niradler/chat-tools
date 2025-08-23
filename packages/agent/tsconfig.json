@@ -7,7 +7,8 @@
         "skipLibCheck": true
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "../../examples/basic-chat/tools"
     ],
     "exclude": [
         "node_modules",

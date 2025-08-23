@@ -3,4 +3,4 @@ export { MCPManager, type MCPManagerConfig } from './mcp-manager';
 export { ApprovalManager, type ApprovalManagerConfig } from './approval-manager';
 
 // Built-in tools
-export * from './tools';
+export * from '../../../examples/basic-chat/tools';
