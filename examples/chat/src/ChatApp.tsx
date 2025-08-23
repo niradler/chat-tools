@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { ChatView, MessageInput, StatusBar, Layout } from "@chat-tools/tui";
-import { Agent, getModel, getTools } from "./ai-agent.js";
+import { createAgent } from "./ai-agent.js";
 
 interface Message {
   id: string;
@@ -24,10 +24,7 @@ export const ChatApp: React.FC = () => {
     const initializeAgent = async () => {
       try {
         setStatus("connecting");
-        const model = getModel();
-        const tools = await getTools();
-        const newAgent = new Agent(model, tools);
-        setAgent(newAgent);
+        setAgent(createAgent());
         setStatus("connected");
 
         // Add welcome message
