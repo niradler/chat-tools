@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-import { eq, desc, asc, like, and, or, lt, gt, sql } from 'drizzle-orm';
-import type { SQLiteSelect } from 'drizzle-orm/sqlite-core';
+import { eq, desc, asc, like, and, lt, gt, sql } from 'drizzle-orm';
+
 import {
   conversations,
   messages,
@@ -9,13 +9,9 @@ import {
   whitelistRules,
   settings,
   type Conversation,
-  type NewConversation,
   type Message,
-  type NewMessage,
   type ApprovalRecord,
-  type NewApprovalRecord,
   type WhitelistRule,
-  type NewWhitelistRule
 } from './schema';
 import { StorageProvider, GetMessagesOptions } from './types';
 
@@ -381,7 +377,11 @@ export class DrizzleStorage implements StorageProvider {
     this.sqlite.close();
   }
 
-
+  async backup(path: string): Promise<void> {
+    // Create a backup of the database
+    const fs = await import('fs/promises');
+    await fs.copyFile(this.dbPath, path);
+  }
 
   async migrate(): Promise<void> {
     // Migrations are handled by drizzle-kit

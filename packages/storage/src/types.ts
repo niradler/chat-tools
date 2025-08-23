@@ -42,6 +42,9 @@ export interface GetMessagesOptions {
 }
 
 export interface StorageProvider {
+  // Initialization
+  initialize(): Promise<void>;
+
   // Conversations
   createConversation(name: string, extension?: string, config?: Record<string, any>): Promise<string>;
   getConversation(id: string): Promise<Conversation | null>;
