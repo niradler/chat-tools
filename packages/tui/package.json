@@ -1,12 +1,36 @@
 {
   "name": "@chat-tools/tui",
   "version": "1.0.0",
-  "description": "Terminal UI components for chat-tools framework",
+  "description": "Comprehensive Terminal User Interface (TUI) components library for building sophisticated terminal-based chat applications with AI integration, tool calling, and human-in-the-loop approval systems",
+  "keywords": [
+    "tui",
+    "terminal",
+    "chat",
+    "ai",
+    "cli",
+    "ink",
+    "react",
+    "components",
+    "tools",
+    "approval"
+  ],
+  "author": "Chat Tools Framework",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/niradler/chat-tools.git",
+    "directory": "packages/tui"
+  },
+  "homepage": "https://github.com/niradler/chat-tools/tree/main/packages/tui",
+  "bugs": {
+    "url": "https://github.com/niradler/chat-tools/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
