@@ -1,4 +1,4 @@
-import { Agent } from './agent';
+import { Agent, type AgentOptions } from './agent';
 import { LanguageModelV2Middleware, type LanguageModelV2 } from '@ai-sdk/provider';
 import { experimental_createMCPClient as createMCPClient } from 'ai';
 import { Experimental_StdioMCPTransport as StdioMCPTransport } from 'ai/mcp-stdio';
@@ -11,7 +11,7 @@ You are a helpful assistant that can check package versions, and provide informa
 When asked about package versions, use the available tools to get the latest information.
 `;
 
-export function getModel(): LanguageModelV2 {
+export function getDefaultModel(): LanguageModelV2 {
     return ollama('qwen3:30b');
 }
 
@@ -41,12 +41,18 @@ export async function getTools(): Promise<Record<string, any>> {
 }
 
 export async function createAgent() {
-    const model = getModel();
+    const model = getDefaultModel();
     const tools = await getTools();
     return new Agent({
         systemPrompt,
         model,
-        tools
+        tools,
+        generateTextOptions: {
+            providerOptions: { ollama: { think: true } }
+        },
+        streamTextOptions: {
+            providerOptions: { ollama: { think: true } }
+        }
     });
 }
 
@@ -64,11 +70,11 @@ export interface ChatOptions {
     name?: string;
     systemPrompt?: string;
     model?: LanguageModelV2;
-    tools?: Record<string, any>;
+    tools?: ToolSet;
     middlewares?: LanguageModelV2Middleware[];
     storage?: StorageProvider;
     dbPath?: string;
-    conversationId?: string;
+    agentOptions?: Partial<AgentOptions>;
 }
 
 export interface ChatMessage {
@@ -80,31 +86,25 @@ export interface ChatMessage {
 export class Chat {
     private agent: Agent;
     private storage: StorageProvider;
-    private conversationId: string | null = null;
-    private middlewares: LanguageModelV2Middleware[] = [];
-    private tools: Record<string, any> = {};
+    private tools: ToolSet = {};
     private model: LanguageModelV2;
     private systemPrompt: string;
+    private agentOptions: Partial<AgentOptions>;
 
     constructor(options: ChatOptions = {}) {
         this.systemPrompt = options.systemPrompt || systemPrompt;
-        this.model = options.model || getModel();
+        this.model = options.model || getDefaultModel();
         this.tools = options.tools || {};
-        this.middlewares = options.middlewares || [];
+        this.agentOptions = options.agentOptions || {};
 
-        // Initialize storage
-        this.storage = options.storage || (new Storage(options.dbPath || './chat.db') as StorageProvider);
+        this.storage = options.storage || (new Storage(options.dbPath || `./${options.name}.db`) as StorageProvider);
 
-        // Initialize agent
         this.agent = new Agent({
             systemPrompt: this.systemPrompt,
             model: this.model,
             tools: this.tools,
-            middlewares: this.middlewares
+            ...this.agentOptions
         });
-
-        // Set conversation ID if provided
-        this.conversationId = options.conversationId || null;
     }
 
     async initialize(): Promise<void> {
@@ -117,23 +117,18 @@ export class Chat {
                 systemPrompt: this.systemPrompt,
                 model: this.model,
                 tools: this.tools,
-                middlewares: this.middlewares
+                ...this.agentOptions
             });
         }
     }
 
-    // Conversation Management
     async createConversation(name: string, config?: Record<string, any>): Promise<string> {
         const conversationId = await this.storage.createConversation(name, 'chat', config);
-        this.conversationId = conversationId;
         return conversationId;
     }
 
     async loadConversation(conversationId: string): Promise<Conversation | null> {
         const conversation = await this.storage.getConversation(conversationId);
-        if (conversation) {
-            this.conversationId = conversationId;
-        }
         return conversation as Conversation | null;
     }
 
@@ -141,36 +136,27 @@ export class Chat {
         return this.storage.listConversations() as Promise<Conversation[]>;
     }
 
-    async deleteConversation(conversationId?: string): Promise<void> {
-        const id = conversationId || this.conversationId;
-        if (!id) throw new Error('No conversation ID provided');
-
-        await this.storage.deleteConversation(id);
-        if (id === this.conversationId) {
-            this.conversationId = null;
-        }
+    async deleteConversation(conversationId: string): Promise<void> {
+        if (!conversationId) throw new Error('No conversation ID provided');
+        await this.storage.deleteConversation(conversationId);
     }
 
     // Message Management
-    async sendMessage(content: string, metadata?: Record<string, any>): Promise<{
+    async sendMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<{
         response: string;
         messageId: string;
         responseId: string;
     }> {
-        if (!this.conversationId) {
-            this.conversationId = await this.createConversation('New Chat');
-        }
-
         // Save user message
         const messageId = await this.storage.addMessage({
-            conversationId: this.conversationId,
+            conversationId,
             role: 'user',
             content,
             metadata
         });
 
         // Get conversation history
-        const history = await this.getConversationHistory();
+        const history = await this.getConversationHistory(conversationId);
 
         // Generate response using agent
         const result = await this.agent.generateTextResponse(content, history);
@@ -178,7 +164,7 @@ export class Chat {
 
         // Save assistant response
         const responseId = await this.storage.addMessage({
-            conversationId: this.conversationId,
+            conversationId,
             role: 'assistant',
             content: response,
             metadata: {
@@ -191,24 +177,20 @@ export class Chat {
         return { response, messageId, responseId };
     }
 
-    async streamMessage(content: string, metadata?: Record<string, any>): Promise<{
+    async streamMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<{
         stream: StreamTextResult<ToolSet, unknown>;
         messageId: string;
     }> {
-        if (!this.conversationId) {
-            this.conversationId = await this.createConversation('New Chat');
-        }
-
         // Save user message
         const messageId = await this.storage.addMessage({
-            conversationId: this.conversationId,
+            conversationId,
             role: 'user',
             content,
             metadata
         });
 
         // Get conversation history
-        const history = await this.getConversationHistory();
+        const history = await this.getConversationHistory(conversationId);
 
         // Generate streaming response using agent
         const stream = await this.agent.streamTextResponse(content, history);
@@ -216,51 +198,29 @@ export class Chat {
         return { stream, messageId };
     }
 
-    async saveAssistantMessage(content: string, metadata?: Record<string, any>): Promise<string> {
-        if (!this.conversationId) {
-            throw new Error('No active conversation');
-        }
-
+    async saveAssistantMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<string> {
         return this.storage.addMessage({
-            conversationId: this.conversationId,
+            conversationId,
             role: 'assistant',
             content,
             metadata
         });
     }
 
-    async getConversationHistory(limit?: number): Promise<Array<{ role: string; content: string }>> {
-        if (!this.conversationId) return [];
-
-        const messages = await this.storage.getMessages(this.conversationId, { limit });
+    async getConversationHistory(conversationId: string, limit?: number): Promise<Array<{ role: string; content: string }>> {
+        const messages = await this.storage.getMessages(conversationId, { limit });
         return messages.map(msg => ({
             role: msg.role,
             content: msg.content
         }));
     }
 
-    async getMessages(options?: { limit?: number; offset?: number; before?: Date; after?: Date }): Promise<Message[]> {
-        if (!this.conversationId) return [];
-        return this.storage.getMessages(this.conversationId, options) as Promise<Message[]>;
+    async getMessages(conversationId: string, options?: { limit?: number; offset?: number; before?: Date; after?: Date }): Promise<Message[]> {
+        return this.storage.getMessages(conversationId, options) as Promise<Message[]>;
     }
 
-    async searchMessages(query: string): Promise<Message[]> {
-        return this.storage.searchMessages(query, this.conversationId || undefined) as Promise<Message[]>;
-    }
-
-    // Middleware Management
-    addMiddleware(middleware: LanguageModelV2Middleware): void {
-        this.middlewares.push(middleware);
-        this.agent.addMiddleware(middleware);
-    }
-
-    setMiddlewares(middlewares: LanguageModelV2Middleware[]): void {
-        this.middlewares = middlewares;
-        this.agent.setMiddlewares(middlewares);
-    }
-
-    getMiddlewares(): LanguageModelV2Middleware[] {
-        return [...this.middlewares];
+    async searchMessages(query: string, conversationId?: string): Promise<Message[]> {
+        return this.storage.searchMessages(query, conversationId) as Promise<Message[]>;
     }
 
     // Tool Management
@@ -276,7 +236,7 @@ export class Chat {
             systemPrompt: this.systemPrompt,
             model: this.model,
             tools: this.tools,
-            middlewares: this.middlewares
+            ...this.agentOptions
         });
     }
 
@@ -291,7 +251,7 @@ export class Chat {
             systemPrompt: this.systemPrompt,
             model: this.model,
             tools: this.tools,
-            middlewares: this.middlewares
+            ...this.agentOptions
         });
     }
 
@@ -306,7 +266,7 @@ export class Chat {
             systemPrompt: this.systemPrompt,
             model: this.model,
             tools: this.tools,
-            middlewares: this.middlewares
+            ...this.agentOptions
         });
     }
 
@@ -314,20 +274,11 @@ export class Chat {
         return this.systemPrompt;
     }
 
-    // Storage Access
     getStorage(): StorageProvider {
         return this.storage;
     }
 
-    // Current State
-    getCurrentConversationId(): string | null {
-        return this.conversationId;
-    }
 
-    async getCurrentConversation(): Promise<Conversation | null> {
-        if (!this.conversationId) return null;
-        return this.storage.getConversation(this.conversationId) as Promise<Conversation | null>;
-    }
 
     // Cleanup
     async close(): Promise<void> {
@@ -348,18 +299,18 @@ async function main() {
     // Initialize the chat (sets up storage and loads tools)
     await chat.initialize();
 
-    // Add logging middleware
-    chat.addMiddleware(loggingMiddleware);
-
     console.log('--- Basic Chat Interaction ---');
 
+    // Create a conversation for our chat
+    const conversationId = await chat.createConversation('Test Conversation');
+
     // Send a message and get response
-    const result1 = await chat.sendMessage('What is the latest version of React?');
+    const result1 = await chat.sendMessage(conversationId, 'What is the latest version of React?');
     console.log('User:', 'What is the latest version of React?');
     console.log('Assistant:', result1.response.substring(0, 200) + '...\n');
 
     // Send another message in the same conversation
-    const result2 = await chat.sendMessage('Can you also check TypeScript?');
+    const result2 = await chat.sendMessage(conversationId, 'Can you also check TypeScript?');
     console.log('User:', 'Can you also check TypeScript?');
     console.log('Assistant:', result2.response.substring(0, 200) + '...\n');
 
@@ -369,27 +320,31 @@ async function main() {
     const conversations = await chat.listConversations();
     console.log('Total conversations:', conversations.length);
 
-    // Get current conversation details
-    const currentConv = await chat.getCurrentConversation();
+    // Get conversation details
+    const currentConv = await chat.loadConversation(conversationId);
     console.log('Current conversation:', currentConv?.name);
 
     // Get conversation history
-    const history = await chat.getConversationHistory();
+    const history = await chat.getConversationHistory(conversationId);
     console.log('Messages in conversation:', history.length);
 
     console.log('--- Search Messages ---');
 
-    // Search messages
-    const searchResults = await chat.searchMessages('React');
-    console.log('Messages containing "React":', searchResults.length);
+    // Search messages in specific conversation
+    const searchResults = await chat.searchMessages('React', conversationId);
+    console.log('Messages containing "React" in this conversation:', searchResults.length);
+
+    // Search messages across all conversations
+    const globalSearchResults = await chat.searchMessages('React');
+    console.log('Messages containing "React" globally:', globalSearchResults.length);
 
     console.log('--- Streaming Example ---');
 
     // Create a new conversation for streaming
-    await chat.createConversation('Streaming Test');
+    const streamingConversationId = await chat.createConversation('Streaming Test');
 
     // Stream a response
-    const { stream } = await chat.streamMessage('Tell me about Node.js');
+    const { stream } = await chat.streamMessage(streamingConversationId, 'Tell me about Node.js');
     console.log('User:', 'Tell me about Node.js');
     console.log('Assistant (streaming):');
 

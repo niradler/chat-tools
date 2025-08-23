@@ -1,5 +1,21 @@
-import { generateText, LanguageModel, stepCountIs, streamText, wrapLanguageModel } from 'ai';
-import type { CallSettings, ToolSet, StopCondition, StreamTextResult, ModelMessage } from 'ai';
+import { generateText, stepCountIs, streamText, wrapLanguageModel } from 'ai';
+import type {
+    CallSettings,
+    ToolSet,
+    StopCondition,
+    StreamTextResult,
+    ModelMessage,
+    ToolChoice,
+    TelemetrySettings,
+    PrepareStepFunction,
+    ToolCallRepairFunction,
+    StreamTextTransform,
+    StreamTextOnChunkCallback,
+    StreamTextOnErrorCallback,
+    StreamTextOnFinishCallback,
+    GenerateTextOnStepFinishCallback,
+    IdGenerator
+} from 'ai';
 import type { LanguageModelV2, LanguageModelV2Middleware } from '@ai-sdk/provider';
 import type { ProviderOptions } from '@ai-sdk/provider-utils';
 
@@ -9,56 +25,100 @@ enum MessageRole {
     Assistant = 'assistant',
 }
 
-type GenerateTextOptions = CallSettings & {
+type GenerateTextOptions<TOOLS extends ToolSet = ToolSet> = CallSettings & {
     model: LanguageModelV2;
     messages: ModelMessage[];
-    tools?: ToolSet;
-    stopWhen?: StopCondition<any>;
+    tools?: TOOLS;
+    toolChoice?: ToolChoice<TOOLS>;
+    system?: string;
+    maxRetries?: number;
+    abortSignal?: AbortSignal;
+    headers?: Record<string, string>;
+    stopWhen?: StopCondition<TOOLS> | Array<StopCondition<TOOLS>>;
+    experimental_telemetry?: TelemetrySettings;
     providerOptions?: ProviderOptions;
+    experimental_activeTools?: Array<keyof TOOLS>;
+    activeTools?: Array<keyof TOOLS>;
+    experimental_prepareStep?: PrepareStepFunction<TOOLS>;
+    prepareStep?: PrepareStepFunction<TOOLS>;
+    experimental_repairToolCall?: ToolCallRepairFunction<TOOLS>;
+    onStepFinish?: GenerateTextOnStepFinishCallback<TOOLS>;
+    experimental_context?: unknown;
+    _internal?: {
+        generateId?: IdGenerator;
+        currentDate?: () => Date;
+    };
 };
 
-interface AgentOptions {
+type StreamTextOptions<TOOLS extends ToolSet = ToolSet> = CallSettings & {
+    model: LanguageModelV2;
+    messages: ModelMessage[];
+    tools?: TOOLS;
+    toolChoice?: ToolChoice<TOOLS>;
+    system?: string;
+    maxRetries?: number;
+    abortSignal?: AbortSignal;
+    headers?: Record<string, string>;
+    stopWhen?: StopCondition<TOOLS> | Array<StopCondition<TOOLS>>;
+    experimental_telemetry?: TelemetrySettings;
+    providerOptions?: ProviderOptions;
+    experimental_activeTools?: Array<keyof TOOLS>;
+    activeTools?: Array<keyof TOOLS>;
+    prepareStep?: PrepareStepFunction<TOOLS>;
+    experimental_repairToolCall?: ToolCallRepairFunction<TOOLS>;
+    experimental_transform?: StreamTextTransform<TOOLS> | Array<StreamTextTransform<TOOLS>>;
+    includeRawChunks?: boolean;
+    onChunk?: StreamTextOnChunkCallback<TOOLS>;
+    onError?: StreamTextOnErrorCallback;
+    onFinish?: StreamTextOnFinishCallback<TOOLS>;
+    onStepFinish?: GenerateTextOnStepFinishCallback<TOOLS>;
+    experimental_context?: unknown;
+    _internal?: {
+        now?: () => number;
+        generateId?: IdGenerator;
+        currentDate?: () => Date;
+    };
+};
+
+export interface AgentOptions<TOOLS extends ToolSet = ToolSet> {
     systemPrompt: string;
-    model: LanguageModel;
-    tools?: Record<string, any>;
+    model: LanguageModelV2;
+    tools?: TOOLS;
     middlewares?: LanguageModelV2Middleware[];
-    baseOptions?: Partial<Omit<GenerateTextOptions, 'model' | 'messages'>>;
+    generateTextOptions?: Partial<GenerateTextOptions<TOOLS>>;
+    streamTextOptions?: Partial<StreamTextOptions<TOOLS>>;
 }
 export class Agent {
     private model: LanguageModelV2;
     private tools: Record<string, any>;
+    private hasTools: boolean;
     private systemPrompt: string;
     private middlewares: LanguageModelV2Middleware[];
-    private baseOptions: Partial<Omit<GenerateTextOptions, 'model' | 'messages'>>;
+    private generateTextOptions: Partial<GenerateTextOptions>;
+    private streamTextOptions: Partial<StreamTextOptions>;
 
     constructor(options: AgentOptions) {
-        const { systemPrompt, model, tools = {}, middlewares = [], baseOptions = {} } = options;
+        const { systemPrompt, model, tools = {}, middlewares = [], generateTextOptions = {}, streamTextOptions = {} } = options;
 
-        // Convert string model to LanguageModelV2 if needed
-        const baseModel = model as LanguageModelV2;
-
-        this.model = middlewares.length > 0
-            ? wrapLanguageModel({ model: baseModel, middleware: middlewares })
-            : baseModel;
+        this.model = model;
         this.tools = tools;
         this.systemPrompt = systemPrompt;
         this.middlewares = middlewares;
-        this.baseOptions = baseOptions;
+        this.generateTextOptions = generateTextOptions;
+        this.streamTextOptions = streamTextOptions;
+        this.model = this.getModel();
+        this.hasTools = tools && Object.keys(tools).length > 0;
+    }
+
+    getModel(): LanguageModelV2 {
+        this.model = this.middlewares.length > 0
+            ? wrapLanguageModel({ model: this.model as LanguageModelV2, middleware: this.middlewares })
+            : this.model;
+        return this.model;
     }
 
     addMiddleware(middleware: LanguageModelV2Middleware) {
         this.middlewares.push(middleware);
-        this.model = wrapLanguageModel({
-            model: this.model as LanguageModelV2,
-            middleware: middleware
-        });
-    }
-
-    setMiddlewares(middlewares: LanguageModelV2Middleware[]) {
-        this.middlewares = middlewares;
-        this.model = middlewares.length > 0
-            ? wrapLanguageModel({ model: this.model as LanguageModelV2, middleware: middlewares })
-            : this.model;
     }
 
     async streamTextResponse(prompt: string, conversationHistory: Array<{ role: string; content: string }> = []): Promise<StreamTextResult<ToolSet, unknown>> {
@@ -77,31 +137,15 @@ export class Agent {
             },
         ];
 
-        const generateOptions = this.getGenerateTextOptions(messages);
-        return streamText(generateOptions);
-    }
-
-    private getGenerateTextOptions(
-        messages: ModelMessage[],
-        additionalOptions: Partial<GenerateTextOptions> = {}
-    ): GenerateTextOptions {
-        const hasTools = this.tools && Object.keys(this.tools).length > 0;
-
-        const baseOptions: GenerateTextOptions = {
-            model: this.model,
+        const streamTextOptions = {
+            model: this.getModel(),
             messages,
-            providerOptions: { ollama: { think: true } },
-            ...this.baseOptions,
-            ...additionalOptions
+            ...this.streamTextOptions
         };
 
-        if (hasTools) {
-            baseOptions.tools = this.tools;
-            baseOptions.stopWhen = stepCountIs(5);
-        }
-
-        return baseOptions;
+        return streamText(streamTextOptions);
     }
+
 
     async generateTextResponse(prompt: string, conversationHistory: Array<{ role: string; content: string }> = []) {
         const messages: ModelMessage[] = [
@@ -119,13 +163,20 @@ export class Agent {
             },
         ];
 
-        const generateOptions = this.getGenerateTextOptions(messages);
+        const generateOptions: GenerateTextOptions = {
+            model: this.getModel(),
+            messages,
+            ...this.generateTextOptions
+        };
+
+        if (this.hasTools) {
+            generateOptions.tools = this.tools;
+            generateOptions.stopWhen = stepCountIs(5);
+        }
         const result = await generateText(generateOptions);
 
         return result;
     }
-
-
 }
 
 
