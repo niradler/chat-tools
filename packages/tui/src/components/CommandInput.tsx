@@ -146,9 +146,26 @@ export const CommandInput: React.FC<CommandInputProps> = ({
         padding={1}
       >
         <Text color={isCommand ? "yellow" : "blue"}>
-          {isCommand ? trigger : "> "}
+          {isCommand ? "" : "> "}
         </Text>
-        <Text>{input}</Text>
+        {isCommand ? (
+          <>
+            <Text color="yellow">{trigger}</Text>
+            {(() => {
+              const parts = commandText.split(" ");
+              const commandName = parts[0];
+              const args = parts.slice(1).join(" ");
+              return (
+                <>
+                  <Text color="yellow">{commandName}</Text>
+                  {args && <Text color="white"> {args}</Text>}
+                </>
+              );
+            })()}
+          </>
+        ) : (
+          <Text color="white">{input}</Text>
+        )}
         {input.length === 0 && (
           <Text color="gray" dimColor>
             {placeholder}

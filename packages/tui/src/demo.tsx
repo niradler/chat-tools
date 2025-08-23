@@ -105,7 +105,7 @@ const DemoApp: React.FC = () => {
       description: "Echo back the provided text",
       handler: (args: string[]) => {
         const text = args.join(" ");
-        addSystemMessage(`Echo: ${text}`);
+        addSystemMessage(text ? `Echo: ${text}` : "Echo: (no text provided)");
       },
     },
   ];
