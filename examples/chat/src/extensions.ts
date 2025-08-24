@@ -63,6 +63,10 @@ export class ExtensionManager {
         this.extensions.sort((a, b) => (b.priority || 0) - (a.priority || 0));
     }
 
+    getExtensions(): Extension[] {
+        return [...this.extensions];
+    }
+
     async init(chat: Chat): Promise<void> {
         for (const extension of this.extensions) {
             if (extension.init) {
@@ -178,7 +182,5 @@ export class ExtensionManager {
         };
     }
 
-    getExtensions(): Extension[] {
-        return [...this.extensions];
-    }
+
 }

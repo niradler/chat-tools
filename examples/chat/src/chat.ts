@@ -5,7 +5,6 @@ import { Storage, type StorageProvider, type Message, type Session } from '@chat
 import type { StreamTextResult, ToolSet } from 'ai';
 import { ExtensionManager, type Extension } from './extensions';
 import { MCPManager, type MCPServerConfig } from './mcp-manager';
-import { ApprovalManager } from './approval-manager';
 
 const systemPrompt = `
 You are a helpful assistant that can check package versions, and provide information about npm packages. 
@@ -76,7 +75,7 @@ export interface ChatMessage {
 }
 
 export class Chat {
-    private agent: Agent;
+    private agent?: Agent;
     private storage: StorageProvider;
     private tools: ToolSet = {};
     private model: LanguageModelV2;
@@ -84,8 +83,6 @@ export class Chat {
     private agentOptions: Partial<AgentOptions>;
     private extensionManager: ExtensionManager;
     private mcpManager: MCPManager;
-    private approvalManager: ApprovalManager;
-    private approvalMode: 'auto' | 'session' | 'global' = 'session';
 
     constructor(options: ChatOptions = {}) {
         this.systemPrompt = options.systemPrompt || systemPrompt;
@@ -97,13 +94,15 @@ export class Chat {
 
         this.storage = options.storage || (new Storage(options.dbPath || `./${options.name}.db`) as StorageProvider);
 
-        // Register extensions
         if (options.extensions) {
             for (const extension of options.extensions) {
                 this.extensionManager.register(extension);
             }
         }
 
+    }
+
+    private async initializeAgent(): Promise<void> {
         const extensionOptions = this.extensionManager.toAISDKOptions();
 
         this.agent = new Agent({
@@ -133,24 +132,14 @@ export class Chat {
         // Merge provided tools with MCP tools
         this.tools = { ...this.tools, ...mcpTools };
 
-        const extensionOptions = this.extensionManager.toAISDKOptions();
-        this.agent = new Agent({
-            systemPrompt: this.systemPrompt,
-            model: this.model,
-            tools: this.tools,
-            ...this.agentOptions,
-            middlewares: [...(this.agentOptions.middlewares || []), ...extensionOptions.middlewares],
-            generateTextOptions: {
-                ...this.agentOptions.generateTextOptions,
-                ...extensionOptions.generateTextOptions
-            },
-            streamTextOptions: {
-                ...this.agentOptions.streamTextOptions,
-                ...extensionOptions.streamTextOptions
-            }
-        });
-
+        // Initialize extensions first
         await this.extensionManager.init(this);
+
+        // Wrap tools with approval system if approval extension is present
+        this.wrapToolsWithApprovalExtension();
+
+        // Initialize the agent with current tools
+        await this.initializeAgent();
     }
 
     async createSession(name: string, config?: Record<string, any>): Promise<string> {
@@ -187,6 +176,10 @@ export class Chat {
 
         const history = await this.getSessionHistory(sessionId);
 
+        if (!this.agent) {
+            throw new Error('Agent not initialized. Call initialize() first.');
+        }
+
         const result = await this.agent.generateTextResponse(content, history);
         const response = result.text || '';
 
@@ -218,6 +211,10 @@ export class Chat {
 
         // Get session history
         const history = await this.getSessionHistory(sessionId);
+
+        if (!this.agent) {
+            throw new Error('Agent not initialized. Call initialize() first.');
+        }
 
         const stream = await this.agent.streamTextResponse(content, history);
 
@@ -303,9 +300,6 @@ export class Chat {
     }
 
 
-
-
-
     addMCPServer(config: MCPServerConfig): void {
         this.mcpManager.addServer(config);
     }
@@ -314,7 +308,34 @@ export class Chat {
         return this.mcpManager.getTools();
     }
 
-    // Cleanup
+    private wrapToolsWithApprovalExtension(): void {
+        // Find approval extension
+        const approvalExtension = this.extensionManager.getExtensions().find(
+            ext => ext.name === 'approval-extension'
+        ) as any;
+
+        if (approvalExtension && approvalExtension.wrapTools) {
+            this.tools = approvalExtension.wrapTools(this.tools);
+        }
+    }
+
+    async addTool(name: string, tool: any): Promise<void> {
+        this.tools[name] = tool;
+        this.wrapToolsWithApprovalExtension();
+        await this.initializeAgent();
+    }
+
+    async removeTool(name: string): Promise<void> {
+        delete this.tools[name];
+        await this.initializeAgent();
+    }
+
+
+
+    getExtensions(): Extension[] {
+        return this.extensionManager.getExtensions();
+    }
+
     async close(): Promise<void> {
         await this.mcpManager.close();
         await this.storage.close();
@@ -325,8 +346,16 @@ export class Chat {
 async function main() {
     console.log('🚀 Testing Chat Class\n');
 
-    // Import extensions
-    const { loggingExtension } = await import('./logging-extension');
+    // Import extension classes using default exports
+    const LoggingExtension = (await import('./logging-extension')).default;
+    const ApprovalExtension = (await import('./approval-extension')).default;
+    const { CLIApprovalStrategy } = await import('./approval-strategies');
+
+    // Create extension instances
+    const loggingExtension = new LoggingExtension();
+    const approvalExtension = new ApprovalExtension({
+        strategy: new CLIApprovalStrategy()
+    });
 
     // Create a new chat instance with extensions and MCP servers
     const chat = new Chat({
@@ -340,7 +369,7 @@ async function main() {
                 providerOptions: { ollama: { think: true } }
             }
         },
-        extensions: [loggingExtension],
+        extensions: [loggingExtension, approvalExtension],
         mcpServers: [
             {
                 type: 'stdio',
@@ -354,9 +383,10 @@ async function main() {
     // Initialize the chat (sets up storage and loads tools)
     await chat.initialize();
 
-    console.log('--- Basic Chat Interaction ---');
+    console.log('--- Basic Chat Interaction with Approval System ---');
 
     const sessionId = await chat.createSession('Test Session');
+    console.log('📋 Note: Tool executions will require approval (CLI prompts)\n');
 
     const result1 = await chat.sendMessage(sessionId, 'What is the latest version of React?');
     console.log('User:', 'What is the latest version of React?');
@@ -376,6 +406,20 @@ async function main() {
 
     const history = await chat.getSessionHistory(sessionId);
     console.log('Messages in session:', history.length);
+
+    console.log('--- Approval System Status ---');
+
+    // Access approval extension directly if needed
+    const approvalExt = chat.getExtensions().find(ext => ext.name === 'approval-extension') as any;
+    if (approvalExt) {
+        const globalTools = await approvalExt.getAutoApprovedTools(undefined, 'global');
+        const sessionTools = await approvalExt.getAutoApprovedTools(sessionId, 'session');
+
+        console.log('Global auto-approved tools:', globalTools.map((t: any) => t.toolName));
+        console.log('Session auto-approved tools:', sessionTools.map((t: any) => t.toolName));
+    } else {
+        console.log('No approval extension installed');
+    }
 
     console.log('--- Search Messages ---');
 

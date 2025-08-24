@@ -162,3 +162,7 @@ pnpm dev
 # Start with config
 ./packages/cli/dist/cli.js start --config ./examples/config-based/shell-expert.json
 ```
+
+DO NOT ADD COMMENTS IN CODE!!!
+
+all our components should be stateless (without this.sessionId etc...), only when i asked you!!
