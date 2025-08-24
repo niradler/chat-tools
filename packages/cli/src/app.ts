@@ -3,7 +3,7 @@ import { render } from 'ink';
 import { DrizzleStorage } from '@chat-tools/storage';
 import { ChatView, MessageInput, Layout } from '@chat-tools/tui';
 import type { Message } from '@chat-tools/tui';
-import { AIAgent } from '@chat-tools/agent';
+import { Agent } from '@chat-tools/agent';
 import type { ChatToolsConfig } from '@chat-tools/core';
 import chalk from 'chalk';
 
@@ -18,7 +18,7 @@ export class ChatApp {
   private workingDirectory: string;
   private verbose: boolean;
   private storage!: DrizzleStorage;
-  private agent!: AIAgent;
+  private agent!: Agent;
   private isShuttingDown = false;
 
   constructor({ config, workingDirectory, verbose = false }: ChatAppConfig) {

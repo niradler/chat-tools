@@ -1,5 +1,5 @@
-import type { Extension } from './extensions';
-import type { Chat } from './chat';
+import type { Extension } from '@chat-tools/extensions';
+import type { Chat } from '@chat-tools/core';
 import { ApprovalManager, type ApprovalStrategy } from './approval-manager';
 import type { Storage } from '@chat-tools/storage';
 
@@ -7,8 +7,10 @@ export interface ApprovalExtensionConfig {
     strategy: ApprovalStrategy;
 }
 
-export default class ApprovalExtension implements Extension {
+export default class ApprovalExtension implements Extension<Chat> {
     name = 'approval-extension';
+    version = '1.0.0';
+    description = 'Adds approval mechanism for tool calls';
     private approvalManager!: ApprovalManager;
     private chat!: Chat;
 

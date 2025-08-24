@@ -8,9 +8,8 @@ import {
   HistoryViewer,
   Dialog,
 } from "@chat-tools/tui";
-import { Chat, type ChatMessage } from "./chat.js";
+import { Chat, type ChatMessage } from "@chat-tools/core";
 import type { Session, Message } from "@chat-tools/storage";
-import LoggingExtension from "./logging-extension.js";
 import ApprovalExtension from "./approval-extension.js";
 import { TUIApprovalStrategy } from "./approval-strategies.js";
 import type {

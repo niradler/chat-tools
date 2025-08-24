@@ -9,13 +9,11 @@
         "dev": "tsc --watch"
     },
     "dependencies": {
-        "@chat-tools/core": "workspace:*",
-        "semver": "^7.5.0",
-        "events": "^3.3.0"
+        "@ai-sdk/provider": "^2.0.0",
+        "ai": "^5.0.22"
     },
     "devDependencies": {
         "typescript": "^5.0.0",
-        "@types/node": "^20.0.0",
-        "@types/semver": "^7.5.0"
+        "@types/node": "^20.0.0"
     }
 }

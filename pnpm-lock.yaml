@@ -32,9 +32,18 @@ importers:
 
   examples/chat:
     dependencies:
-      '@ai-sdk/openai':
-        specifier: ^2.0.19
-        version: 2.0.19(zod@3.25.76)
+      '@chat-tools/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@chat-tools/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@chat-tools/extensions':
+        specifier: workspace:*
+        version: link:../../packages/extensions
+      '@chat-tools/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@chat-tools/tui':
         specifier: workspace:*
         version: link:../../packages/tui
@@ -69,33 +78,12 @@ importers:
 
   packages/agent:
     dependencies:
-      '@ai-sdk/anthropic':
-        specifier: ^2.0.6
-        version: 2.0.6(zod@3.25.76)
-      '@ai-sdk/openai':
-        specifier: ^2.0.19
-        version: 2.0.19(zod@3.25.76)
-      '@chat-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      '@chat-tools/storage':
-        specifier: workspace:*
-        version: link:../storage
-      '@clack/prompts':
-        specifier: ^0.8.0
-        version: 0.8.2
-      '@mastra/core':
-        specifier: ^0.2.0
-        version: 0.2.1(react@18.3.1)
+      '@ai-sdk/provider':
+        specifier: ^2.0.0
+        version: 2.0.0
       ai:
         specifier: ^5.0.22
         version: 5.0.22(zod@3.25.76)
-      ollama-ai-provider-v2:
-        specifier: ^1.1.2
-        version: 1.1.2(zod@3.25.76)
-      zod:
-        specifier: ^3.22.0
-        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -149,12 +137,27 @@ importers:
 
   packages/core:
     dependencies:
+      '@ai-sdk/provider':
+        specifier: ^2.0.0
+        version: 2.0.0
+      '@chat-tools/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@chat-tools/extensions':
+        specifier: workspace:*
+        version: link:../extensions
       '@chat-tools/storage':
         specifier: workspace:*
         version: link:../storage
-      '@chat-tools/tui':
-        specifier: workspace:*
-        version: link:../tui
+      ai:
+        specifier: ^5.0.22
+        version: 5.0.22(zod@3.25.76)
+      ollama-ai-provider-v2:
+        specifier: ^1.1.2
+        version: 1.1.2(zod@3.25.76)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -165,22 +168,16 @@ importers:
 
   packages/extensions:
     dependencies:
-      '@chat-tools/core':
-        specifier: workspace:*
-        version: link:../core
-      events:
-        specifier: ^3.3.0
-        version: 3.3.0
-      semver:
-        specifier: ^7.5.0
-        version: 7.7.2
+      '@ai-sdk/provider':
+        specifier: ^2.0.0
+        version: 2.0.0
+      ai:
+        specifier: ^5.0.22
+        version: 5.0.22(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.11
-      '@types/semver':
-        specifier: ^7.5.0
-        version: 7.7.0
       typescript:
         specifier: ^5.0.0
         version: 5.9.2
@@ -271,20 +268,8 @@ importers:
 
 packages:
 
-  '@ai-sdk/anthropic@2.0.6':
-    resolution: {integrity: sha512-ZSAU1xUebumWF1ldgkq9nz8iT7Ew9DGTX8Z4c2mvmlexifxzOMdj9cNLld5DlRD5dr4ULjSnTZywPKyMlAEcdQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4
-
   '@ai-sdk/gateway@1.0.11':
     resolution: {integrity: sha512-ErwWS3sPOuWy42eE3AVxlKkTa1XjjKBEtNCOylVKMO5KNyz5qie8QVlLYbULOG56dtxX4zTKX3rQNJudplhcmQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4
-
-  '@ai-sdk/openai@2.0.19':
-    resolution: {integrity: sha512-sG3/IVaPvV7Vn6513I1bcJILHpLCXbVif2ht6CyROcB9FzXCJe2K5uRbAg30HWsdCEe7xu4OAWtMK6yWTOcsSA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4
@@ -4190,19 +4175,7 @@ packages:
 
 snapshots:
 
-  '@ai-sdk/anthropic@2.0.6(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.5(zod@3.25.76)
-      zod: 3.25.76
-
   '@ai-sdk/gateway@1.0.11(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.5(zod@3.25.76)
-      zod: 3.25.76
-
-  '@ai-sdk/openai@2.0.19(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@ai-sdk/provider-utils': 3.0.5(zod@3.25.76)

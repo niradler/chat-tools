@@ -1,4 +1,4 @@
-import type { Extension } from './extensions';
+import type { Extension } from './extension-manager';
 
 export interface ExtensionConfig {
     name: string;
@@ -21,8 +21,7 @@ export class ExtensionRegistry {
 
         const module = await importFn();
 
-        // Get the extension from the module (try different export names)
-        const ExtensionExport = module.LoggingExtension || module.ApprovalExtension || module.Extension;
+        const ExtensionExport = module.default || module;
 
         if (!ExtensionExport) {
             throw new Error(`No extension export found in module for '${name}'`);
@@ -52,4 +51,3 @@ export class ExtensionRegistry {
         return extensions;
     }
 }
-

@@ -1,4 +1,6 @@
 export * from './types';
+export { MCPManager } from './mcp-manager';
+export { Chat, type ChatOptions, type ChatMessage, getDefaultModel, getTools, createAgent } from './chat';
 import { ChatToolsConfig, AgentTemplate } from './types';
 
 // Default configurations

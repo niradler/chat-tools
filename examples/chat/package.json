@@ -10,6 +10,10 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@chat-tools/agent": "workspace:*",
+    "@chat-tools/core": "workspace:*",
+    "@chat-tools/extensions": "workspace:*",
+    "@chat-tools/storage": "workspace:*",
     "@chat-tools/tui": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ai": "^5.0.22",

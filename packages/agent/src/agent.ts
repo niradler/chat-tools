@@ -17,7 +17,7 @@ import type {
     IdGenerator
 } from 'ai';
 import type { LanguageModelV2, LanguageModelV2Middleware } from '@ai-sdk/provider';
-import type { ProviderOptions } from '@ai-sdk/provider-utils';
+
 
 enum MessageRole {
     System = 'system',
@@ -36,7 +36,7 @@ type GenerateTextOptions<TOOLS extends ToolSet = ToolSet> = CallSettings & {
     headers?: Record<string, string>;
     stopWhen?: StopCondition<TOOLS> | Array<StopCondition<TOOLS>>;
     experimental_telemetry?: TelemetrySettings;
-    providerOptions?: ProviderOptions;
+
     experimental_activeTools?: Array<keyof TOOLS>;
     activeTools?: Array<keyof TOOLS>;
     experimental_prepareStep?: PrepareStepFunction<TOOLS>;
@@ -61,7 +61,7 @@ type StreamTextOptions<TOOLS extends ToolSet = ToolSet> = CallSettings & {
     headers?: Record<string, string>;
     stopWhen?: StopCondition<TOOLS> | Array<StopCondition<TOOLS>>;
     experimental_telemetry?: TelemetrySettings;
-    providerOptions?: ProviderOptions;
+
     experimental_activeTools?: Array<keyof TOOLS>;
     activeTools?: Array<keyof TOOLS>;
     prepareStep?: PrepareStepFunction<TOOLS>;
@@ -88,6 +88,7 @@ export interface AgentOptions<TOOLS extends ToolSet = ToolSet> {
     generateTextOptions?: Partial<GenerateTextOptions<TOOLS>>;
     streamTextOptions?: Partial<StreamTextOptions<TOOLS>>;
 }
+
 export class Agent {
     private model: LanguageModelV2;
     private tools: Record<string, any>;
@@ -183,6 +184,3 @@ export class Agent {
         return result;
     }
 }
-
-
-
