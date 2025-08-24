@@ -1,10 +1,11 @@
 import { Agent, type AgentOptions } from './agent';
 import { LanguageModelV2Middleware, type LanguageModelV2 } from '@ai-sdk/provider';
 import { ollama } from 'ollama-ai-provider-v2';
-import { Storage, type StorageProvider, type SchemaMessage as Message, type SchemaConversation as Conversation } from '@chat-tools/storage';
+import { Storage, type StorageProvider, type Message, type Session } from '@chat-tools/storage';
 import type { StreamTextResult, ToolSet } from 'ai';
 import { ExtensionManager, type Extension } from './extensions';
 import { MCPManager, type MCPServerConfig } from './mcp-manager';
+import { ApprovalManager } from './approval-manager';
 
 const systemPrompt = `
 You are a helpful assistant that can check package versions, and provide information about npm packages. 
@@ -83,6 +84,8 @@ export class Chat {
     private agentOptions: Partial<AgentOptions>;
     private extensionManager: ExtensionManager;
     private mcpManager: MCPManager;
+    private approvalManager: ApprovalManager;
+    private approvalMode: 'auto' | 'session' | 'global' = 'session';
 
     constructor(options: ChatOptions = {}) {
         this.systemPrompt = options.systemPrompt || systemPrompt;
@@ -150,45 +153,45 @@ export class Chat {
         await this.extensionManager.init(this);
     }
 
-    async createConversation(name: string, config?: Record<string, any>): Promise<string> {
-        const conversationId = await this.storage.createConversation(name, 'chat', config);
-        return conversationId;
+    async createSession(name: string, config?: Record<string, any>): Promise<string> {
+        const sessionId = await this.storage.createSession(name, 'chat', config);
+        return sessionId;
     }
 
-    async loadConversation(conversationId: string): Promise<Conversation | null> {
-        const conversation = await this.storage.getConversation(conversationId);
-        return conversation as Conversation | null;
+    async loadSession(sessionId: string): Promise<Session | null> {
+        const session = await this.storage.getSession(sessionId);
+        return session as Session | null;
     }
 
-    async listConversations(): Promise<Conversation[]> {
-        return this.storage.listConversations() as Promise<Conversation[]>;
+    async listSessions(): Promise<Session[]> {
+        return this.storage.listSessions() as Promise<Session[]>;
     }
 
-    async deleteConversation(conversationId: string): Promise<void> {
-        if (!conversationId) throw new Error('No conversation ID provided');
-        await this.storage.deleteConversation(conversationId);
+    async deleteSession(sessionId: string): Promise<void> {
+        if (!sessionId) throw new Error('No session ID provided');
+        await this.storage.deleteSession(sessionId);
     }
 
     // Message Management
-    async sendMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<{
+    async sendMessage(sessionId: string, content: string, metadata?: Record<string, any>): Promise<{
         response: string;
         messageId: string;
         responseId: string;
     }> {
         const messageId = await this.storage.addMessage({
-            conversationId,
+            sessionId,
             role: 'user',
             content,
             metadata
         });
 
-        const history = await this.getConversationHistory(conversationId);
+        const history = await this.getSessionHistory(sessionId);
 
         const result = await this.agent.generateTextResponse(content, history);
         const response = result.text || '';
 
         const responseId = await this.storage.addMessage({
-            conversationId,
+            sessionId,
             role: 'assistant',
             content: response,
             metadata: {
@@ -201,49 +204,49 @@ export class Chat {
         return { response, messageId, responseId };
     }
 
-    async streamMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<{
+    async streamMessage(sessionId: string, content: string, metadata?: Record<string, any>): Promise<{
         stream: StreamTextResult<ToolSet, unknown>;
         messageId: string;
     }> {
         // Save user message
         const messageId = await this.storage.addMessage({
-            conversationId,
+            sessionId,
             role: 'user',
             content,
             metadata
         });
 
-        // Get conversation history
-        const history = await this.getConversationHistory(conversationId);
+        // Get session history
+        const history = await this.getSessionHistory(sessionId);
 
         const stream = await this.agent.streamTextResponse(content, history);
 
         return { stream, messageId };
     }
 
-    async saveAssistantMessage(conversationId: string, content: string, metadata?: Record<string, any>): Promise<string> {
+    async saveAssistantMessage(sessionId: string, content: string, metadata?: Record<string, any>): Promise<string> {
         return this.storage.addMessage({
-            conversationId,
+            sessionId,
             role: 'assistant',
             content,
             metadata
         });
     }
 
-    async getConversationHistory(conversationId: string, limit?: number): Promise<Array<{ role: string; content: string }>> {
-        const messages = await this.storage.getMessages(conversationId, { limit });
+    async getSessionHistory(sessionId: string, limit?: number): Promise<Array<{ role: string; content: string }>> {
+        const messages = await this.storage.getMessages(sessionId, { limit });
         return messages.map(msg => ({
             role: msg.role,
             content: msg.content
         }));
     }
 
-    async getMessages(conversationId: string, options?: { limit?: number; offset?: number; before?: Date; after?: Date }): Promise<Message[]> {
-        return this.storage.getMessages(conversationId, options) as Promise<Message[]>;
+    async getMessages(sessionId: string, options?: { limit?: number; offset?: number; before?: Date; after?: Date }): Promise<Message[]> {
+        return this.storage.getMessages(sessionId, options) as Promise<Message[]>;
     }
 
-    async searchMessages(query: string, conversationId?: string): Promise<Message[]> {
-        return this.storage.searchMessages(query, conversationId) as Promise<Message[]>;
+    async searchMessages(query: string, sessionId?: string): Promise<Message[]> {
+        return this.storage.searchMessages(query, sessionId) as Promise<Message[]>;
     }
 
     // Tool Management
@@ -353,50 +356,40 @@ async function main() {
 
     console.log('--- Basic Chat Interaction ---');
 
-    // Create a conversation for our chat
-    const conversationId = await chat.createConversation('Test Conversation');
+    const sessionId = await chat.createSession('Test Session');
 
-    // Send a message and get response
-    const result1 = await chat.sendMessage(conversationId, 'What is the latest version of React?');
+    const result1 = await chat.sendMessage(sessionId, 'What is the latest version of React?');
     console.log('User:', 'What is the latest version of React?');
     console.log('Assistant:', result1.response.substring(0, 200) + '...\n');
 
-    // Send another message in the same conversation
-    const result2 = await chat.sendMessage(conversationId, 'Can you also check TypeScript?');
+    const result2 = await chat.sendMessage(sessionId, 'Can you also check TypeScript?');
     console.log('User:', 'Can you also check TypeScript?');
     console.log('Assistant:', result2.response.substring(0, 200) + '...\n');
 
-    console.log('--- Conversation Management ---');
+    console.log('--- Session Management ---');
 
-    // List all conversations
-    const conversations = await chat.listConversations();
-    console.log('Total conversations:', conversations.length);
+    const sessions = await chat.listSessions();
+    console.log('Total sessions:', sessions.length);
 
-    // Get conversation details
-    const currentConv = await chat.loadConversation(conversationId);
-    console.log('Current conversation:', currentConv?.name);
+    const currentSession = await chat.loadSession(sessionId);
+    console.log('Current session:', currentSession?.name);
 
-    // Get conversation history
-    const history = await chat.getConversationHistory(conversationId);
-    console.log('Messages in conversation:', history.length);
+    const history = await chat.getSessionHistory(sessionId);
+    console.log('Messages in session:', history.length);
 
     console.log('--- Search Messages ---');
 
-    // Search messages in specific conversation
-    const searchResults = await chat.searchMessages('React', conversationId);
-    console.log('Messages containing "React" in this conversation:', searchResults.length);
+    const searchResults = await chat.searchMessages('React', sessionId);
+    console.log('Messages containing "React" in this session:', searchResults.length);
 
-    // Search messages across all conversations
     const globalSearchResults = await chat.searchMessages('React');
     console.log('Messages containing "React" globally:', globalSearchResults.length);
 
     console.log('--- Streaming Example ---');
 
-    // Create a new conversation for streaming
-    const streamingConversationId = await chat.createConversation('Streaming Test');
+    const streamingSessionId = await chat.createSession('Streaming Test');
 
-    // Stream a response
-    const { stream } = await chat.streamMessage(streamingConversationId, 'Tell me about Node.js');
+    const { stream } = await chat.streamMessage(streamingSessionId, 'Tell me about Node.js');
     console.log('User:', 'Tell me about Node.js');
     console.log('Assistant (streaming):');
 

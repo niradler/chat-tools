@@ -1,14 +1,14 @@
 # Chat Tools Framework
 
-A TypeScript framework for building intelligent terminal chat applications with MCP integration, tool calling, and human-in-the-loop approval.
+A TypeScript framework for building intelligent terminal chat applications with MCP integration, tool calling, and human-in-the-loop approval systems.
 
 ## Features
 
 - 🎨 **Modern Terminal UI** - Built with Ink (React for terminal)
-- 🤖 **AI Agent Integration** - Powered by Mastra framework
+- 🤖 **AI Agent Integration** - AI SDK v5 with multiple provider support
 - 🔧 **MCP Protocol Support** - Connect to any MCP server
-- ✋ **Human-in-the-Loop** - Smart approval system with whitelisting
-- 🗄️ **Persistent History** - SQLite-based chat and approval history
+- ✋ **Smart Approval System** - Global and session-specific tool auto-approval
+- 🗄️ **Session Management** - SQLite-based chat sessions and history
 - 📦 **Modular Architecture** - Easy to extend and customize
 
 ## Quick Start
@@ -26,7 +26,7 @@ chat-tools start --extension shell
 
 ## Package Structure
 
-- **@chat-tools/storage** - Database, history, settings management
+- **@chat-tools/storage** - Database, sessions, auto-approval management
 - **@chat-tools/tui** - Reusable terminal UI components
 - **@chat-tools/agent** - AI agent, MCP, approval system
 - **@chat-tools/cli** - Command-line interface

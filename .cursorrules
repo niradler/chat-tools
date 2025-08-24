@@ -11,7 +11,7 @@ TypeScript framework for building intelligent terminal chat applications with MC
 ```
 packages/
 ├── core/          # Types, configs, agent templates
-├── storage/       # Drizzle ORM + SQLite database
+├── storage/       # Drizzle ORM + SQLite sessions & auto-approval
 ├── tui/          # Ink React terminal UI components
 ├── agent/        # AI SDK v5 integration + MCP + approval
 ├── cli/          # Commander.js CLI interface
@@ -47,8 +47,9 @@ packages/
 
 ### Safety & Approval
 
-- Classify operations as safe/dangerous in approval rules
-- Use whitelisting for commonly safe operations
+- Global auto-approval: Tools approved for all sessions
+- Session auto-approval: Tools approved for specific sessions only
+- Smart approval system checks global first, then session-specific
 - Provide clear warnings for destructive actions
 - Implement proper error handling and validation
 
