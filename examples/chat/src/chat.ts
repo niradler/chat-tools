@@ -447,7 +447,8 @@ async function main() {
     console.log('\n✅ Chat test completed');
 }
 
-if (require.main === module) {
+// Only run main if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
     main().catch(console.error);
 }
 

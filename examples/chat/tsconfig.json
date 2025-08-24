@@ -8,7 +8,9 @@
         "target": "ES2022",
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": false,
-        "noEmit": false
+        "noEmit": false,
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true
     },
     "include": [
         "src/**/*"
