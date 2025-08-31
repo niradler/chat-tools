@@ -12,7 +12,6 @@ import {
   CommandPrompt,
   CommandInput,
   HistoryViewer,
-  SuggestionsDisplay,
   LoadingSpinner,
   ProgressBar,
   Dialog,
@@ -305,7 +304,9 @@ const DemoApp: React.FC = () => {
           <Text>• ToolConfirmation - Tool execution approval</Text>
           <Text>• CommandPrompt - Interactive command input</Text>
           <Text>• HistoryViewer - Command/message history</Text>
-          <Text>• SuggestionsDisplay - Smart suggestions</Text>
+          <Text>• ClipboardContext - Clipboard content viewer</Text>
+          <Text>• TodoList - Task management with tasuku</Text>
+          <Text>• CodeBlock - Syntax highlighted code</Text>
           <Text>• LoadingSpinner - Various loading animations</Text>
           <Text>• ProgressBar - Progress indication</Text>
         </Box>
@@ -426,20 +427,17 @@ const DemoApp: React.FC = () => {
     </Box>
   );
 
-  const renderSuggestionsDemo = () => (
+  const renderNewComponentsDemo = () => (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
         <Text bold color="green">
-          💡 Suggestions Component
+          🆕 New Components Demo
         </Text>
       </Box>
-      <SuggestionsDisplay
-        suggestions={sampleSuggestions}
-        onSelect={() => {}}
-        title="Smart Suggestions"
-        showCategories={true}
-        maxVisible={6}
-      />
+      <Text>• ClipboardContext - Press Ctrl+V to simulate</Text>
+      <Text>• TodoList - Interactive task management</Text>
+      <Text>• CodeBlock - Syntax highlighted code display</Text>
+      <Text>• Dialog - Modal dialogs with content</Text>
     </Box>
   );
 
@@ -536,7 +534,7 @@ const DemoApp: React.FC = () => {
       case "history":
         return renderHistoryDemo();
       case "suggestions":
-        return renderSuggestionsDemo();
+        return renderNewComponentsDemo();
       case "progress":
         return renderProgressDemo();
       case "live":

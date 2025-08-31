@@ -8,10 +8,13 @@ export * from './ToolConfirmation.js';
 export * from './CommandPrompt.js';
 export * from './CommandInput.js';
 export * from './HistoryViewer.js';
-export * from './SuggestionsDisplay.js';
+
 export * from './LoadingSpinner.js';
 export * from './ProgressBar.js';
 export * from './Dialog.js';
 export * from './RadioButtonSelect.js';
+export * from './ClipboardContext.js';
+export * from './TodoList.js';
+export * from './CodeBlock.js';
 export * from './shared/MaxSizedBox.js';
 export * from './shared/TextBuffer.js';
